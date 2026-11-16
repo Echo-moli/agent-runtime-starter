@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 permissions:
-  contents: read
+  contents: write   # 创建 GitHub Release
   packages: write
 
 jobs:
@@ -41,3 +41,21 @@ jobs:
         env:
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 打 tag 只生成空壳页面，这里补一个真正的 Release（带 Release Notes 与可下载 jar）。
+      # 幂等：Release 已存在就跳过，重跑工作流不会失败。
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists, skip"
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME — Agent 可靠性增强层" \
+            --generate-notes \
+            "agent-runtime-core/target/agent-runtime-core-${VERSION}.jar" \
+            "agent-runtime-spring-boot-starter/target/agent-runtime-spring-boot-starter-${VERSION}.jar"
