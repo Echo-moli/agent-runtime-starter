@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.agentruntime</groupId>
+        <artifactId>agent-runtime-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>agent-runtime-core</artifactId>
+    <name>agent-runtime-core</name>
+    <description>核心模块：纯 JDK，零 Spring、零 LLM 框架依赖（这条约束贯穿全部里程碑）</description>
+
+    <!--
+      JUnit 只在 test 作用域：不进主代码依赖树、不向使用方传递，core 的「零第三方依赖」约束不变。
+      版本由 parent 的 spring-boot-dependencies BOM 统一管理。
+    -->
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

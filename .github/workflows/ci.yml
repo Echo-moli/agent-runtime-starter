@@ -1,0 +1,81 @@
+name: CI
+
+# 双轨门禁：
+#   verify      —— core/starter 单测 + M5 评测门禁，用 H2 替身，不依赖外部服务；
+#   pg-dialect  —— 用 Docker service container 起真实 PostgreSQL 16 跑全部验收 demo，
+#                  覆盖 JSONB / BIGSERIAL / TIMESTAMPTZ / INSERT...WHERE EXISTS 真方言。
+# 两条轨道都要过：替身验证逻辑，真库验证方言，谁也替代不了谁。
+# 真库轨道与本地复跑共用 scripts/verify-pg.sh，避免两套命令漂移。
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # 双版本门禁：17 验证「开箱即用」的默认路径，21 验证 DESIGN 目标版本。
+    # 两条路径都跑同一套单测 + 评测门禁，确保「默认能跑」与「目标版本能跑」不漂移。
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - java: '17'
+            profile: ''
+          - java: '21'
+            profile: '-Pjava21'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      # verify 而非 test：eval-gate 挂在 verify 阶段（samples/pom.xml 的 exec 插件），
+      # 用 test 会把评测门禁静默跳过——那是这个仓库最容易踩的漏测点。
+      - name: Build and gate (JDK ${{ matrix.java }})
+        run: mvn -B clean verify ${{ matrix.profile }}
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: agent-runtime-samples/target/eval-report.md
+          if-no-files-found: warn
+
+  pg-dialect:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: agent_runtime
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d agent_runtime"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # PG 由 service container 提供，脚本里的 docker compose up 要跳过；
+      # 其余（构建、classpath、全部 demo、halt(17) 断言）与本地一条命令完全一致。
+      - name: Run all milestone demos on real PostgreSQL 16
+        env:
+          SKIP_DOCKER_UP: '1'
+        run: bash scripts/verify-pg.sh

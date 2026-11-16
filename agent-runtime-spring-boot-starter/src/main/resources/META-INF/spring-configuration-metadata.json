@@ -1,0 +1,143 @@
+{
+  "groups": [
+    { "name": "agent.runtime", "type": "com.agentruntime.autoconfigure.AgentRuntimeProperties", "description": "Agent 运行时引擎参数。" },
+    { "name": "agent.runtime.ops", "type": "com.agentruntime.autoconfigure.AgentRuntimeProperties$Ops", "description": "运维控制面参数。" }
+  ],
+  "properties": [
+    {
+      "name": "agent.runtime.max-steps",
+      "type": "java.lang.Integer",
+      "description": "单任务最多决策几步，防止 agent 原地打转。默认 25。",
+      "defaultValue": 25
+    },
+    {
+      "name": "agent.runtime.executor-threads",
+      "type": "java.lang.Integer",
+      "description": "执行器线程数；0 表示按 CPU 核数自动（至少 2）。默认 0。",
+      "defaultValue": 0
+    },
+    {
+      "name": "agent.runtime.retry-enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用工具重试。默认 true。",
+      "defaultValue": true
+    },
+    {
+      "name": "agent.runtime.retry-max-delay-ms",
+      "type": "java.lang.Long",
+      "description": "重试退避上限毫秒；0 表示用引擎默认。默认 0。",
+      "defaultValue": 0
+    },
+    {
+      "name": "agent.runtime.in-doubt-policy",
+      "type": "com.agentruntime.domain.InDoubtPolicy",
+      "description": "工具结果在途未知（INIT）时的策略。默认 SUSPEND_FOR_HUMAN（挂起等人，不赌钱）。",
+      "defaultValue": "SUSPEND_FOR_HUMAN"
+    },
+    {
+      "name": "agent.runtime.schema-init",
+      "type": "java.lang.Boolean",
+      "description": "启动时自动建表（IF NOT EXISTS）。生产建议关闭并交给 Flyway。默认 true。",
+      "defaultValue": true
+    },
+    {
+      "name": "agent.runtime.metrics-enabled",
+      "type": "java.lang.Boolean",
+      "description": "是否启用指标埋点。默认 true。",
+      "defaultValue": true
+    },
+    {
+      "name": "agent.runtime.tracer",
+      "type": "com.agentruntime.autoconfigure.AgentRuntimeProperties$TracerMode",
+      "description": "链路追踪输出：NONE / CONSOLE。默认 NONE。",
+      "defaultValue": "NONE"
+    },
+    {
+      "name": "agent.runtime.lease-ttl",
+      "type": "java.time.Duration",
+      "description": "心跳停止多久算租约过期、任务可被判为孤儿接管。必须大于最慢的一步。默认 5m。",
+      "defaultValue": "5m"
+    },
+    {
+      "name": "agent.runtime.instance-id",
+      "type": "java.lang.String",
+      "description": "实例标识，写入 task.owner_id。默认 hostname + 随机串。"
+    },
+    {
+      "name": "agent.runtime.queue-capacity",
+      "type": "java.lang.Integer",
+      "description": "执行器有界队列容量；满了用 CallerRunsPolicy 背压，防止无界队列 OOM。默认 200。",
+      "defaultValue": 200
+    },
+    {
+      "name": "agent.runtime.max-results",
+      "type": "java.lang.Integer",
+      "description": "内存结果缓存上限；超限淘汰最早的已完成任务（在途的不淘汰）。默认 10000。",
+      "defaultValue": 10000
+    },
+    {
+      "name": "agent.runtime.shutdown-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "优雅停机等待在途任务的最长毫秒数，超时才强制中断。默认 10000。",
+      "defaultValue": 10000
+    },
+    {
+      "name": "agent.runtime.ops.allow-bulk-recover",
+      "type": "java.lang.Boolean",
+      "description": "是否允许「恢复所有孤儿」批量操作。默认 false——防滚动发布时新实例抢跑重放。",
+      "defaultValue": false
+    },
+    {
+      "name": "agent.runtime.ops.stale-in-doubt-after",
+      "type": "java.time.Duration",
+      "description": "幂等记录停在 INIT 多久算「超期未决」（唯一可能资损的状态）。默认 15m。",
+      "defaultValue": "15m"
+    },
+    {
+      "name": "agent.runtime.ops.max-list-size",
+      "type": "java.lang.Integer",
+      "description": "运维端点一次最多返回多少条任务。默认 50。",
+      "defaultValue": 50
+    },
+    {
+      "name": "agent.runtime.ops.strict-auth",
+      "type": "java.lang.Boolean",
+      "description": "true=运维端点用 ownerOrAdmin 鉴权，匿名变更被拒（需注入 OpsPrincipal bean 提供身份）。默认 false 保持兼容。",
+      "defaultValue": false
+    },
+    {
+      "name": "agent.runtime.ops.audit-jdbc",
+      "type": "java.lang.Boolean",
+      "description": "true=审计写入 ops_audit 表（需有 DataSource 且表已建，schema-init/Flyway 均会建）。默认 false 用有界内存审计。",
+      "defaultValue": false
+    },
+    {
+      "name": "agent.runtime.ops.registry-jdbc",
+      "type": "java.lang.Boolean",
+      "description": "true=实例注册表用共享 JDBC 表（多副本部署必须）；默认 false 用单实例内存版。需有 DataSource 且表已建，schema-init/Flyway 均会建。",
+      "defaultValue": false
+    },
+    {
+      "name": "agent.runtime.ops.alert-webhook-url",
+      "type": "java.lang.String",
+      "description": "告警 webhook 地址（企微/钉钉机器人或自建转发）。不配则告警走 NOOP；发送异步、失败不阻塞业务、同一事件 30 秒内去重。"
+    }
+  ],
+  "hints": [
+    {
+      "name": "agent.runtime.in-doubt-policy",
+      "values": [
+        { "value": "SUSPEND_FOR_HUMAN", "description": "挂起等人确认（默认，最安全）" },
+        { "value": "RETRY", "description": "当作可重试失败，自动重试" },
+        { "value": "FAIL", "description": "直接失败" }
+      ]
+    },
+    {
+      "name": "agent.runtime.tracer",
+      "values": [
+        { "value": "NONE", "description": "不输出（默认）" },
+        { "value": "CONSOLE", "description": "输出到控制台" }
+      ]
+    }
+  ]
+}

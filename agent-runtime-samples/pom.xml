@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.agentruntime</groupId>
+        <artifactId>agent-runtime-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>agent-runtime-samples</artifactId>
+    <name>agent-runtime-samples</name>
+    <description>可跑验收 demo：M1–M5（退款闭环 / 崩溃续跑 / 幂等重试挂起 / 成本与指标 / 评测门禁）、
+        M8（自动装配）/ M9（运维控制面）；M11 起数据库默认 PostgreSQL（H2 仅离线兜底）</description>
+
+    <!-- M5 评测门禁参数：mvn verify -Deval.threshold=0.9 / -Deval.skip=true -->
+    <properties>
+        <eval.threshold>1.0</eval.threshold>
+        <eval.maxCost>0.30</eval.maxCost>
+        <eval.skip>false</eval.skip>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.agentruntime</groupId>
+            <artifactId>agent-runtime-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- M8：演示「业务方只加一个依赖」——starter 把引擎与自动装配一起带进来 -->
+        <dependency>
+            <groupId>com.agentruntime</groupId>
+            <artifactId>agent-runtime-spring-boot-starter</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- M9 demo 要真起 Web 容器并 curl actuator 端点，所以需要 web + actuator -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- M8 demo 是一个真的 Spring Boot 应用（Web 类型为 NONE），故需要 starter 与日志 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!--
+          M11：数据库默认走 PostgreSQL（与生产同方言），postgresql 驱动是演示的运行时依赖。
+          core 本身仍然零依赖——驱动只出现在 samples 里。
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+
+        <!--
+          H2 只作离线兜底：没装 PG 时用 -Dagent.db=h2 仍能跑「崩溃续跑」这两条跨进程演示。
+          它不是默认路径，也不是 DDL 主脚本所对应的数据库。
+        -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.2.224</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--
+              M5 门禁接 CI：verify 阶段跑评测集，通过率低于 eval.threshold 就让 build 失败。
+
+              为什么绑在 verify 而不是 test：test 阶段在 core/starter 也要跑，而评测需要
+              samples 里的业务夹具；verify 是「产物已打包、发布前」的最后一道，
+              门禁放在这里与「能不能发」这个语义对齐。
+
+              为什么用 exec 而不引入 JUnit：core 零第三方依赖是硬约束，引入 junit 会把
+              test 依赖带到下游项目的依赖树里；而评测集本身就是一个 main，
+              在 CI 与本地用同一条命令跑，反而比两头维护更可靠。
+            -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>eval-gate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>com.agentruntime.samples.eval.EvalGate</mainClass>
+                            <arguments>
+                                <argument>${eval.threshold}</argument>
+                            </arguments>
+                            <systemProperties>
+                                <systemProperty>
+                                    <key>eval.maxCost</key>
+                                    <value>${eval.maxCost}</value>
+                                </systemProperty>
+                                <!-- 报告跟着模块产物目录走，别落到被调用方的工作目录里 -->
+                                <systemProperty>
+                                    <key>eval.report</key>
+                                    <value>${project.build.directory}/eval-report.md</value>
+                                </systemProperty>
+                            </systemProperties>
+                            <skip>${eval.skip}</skip>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

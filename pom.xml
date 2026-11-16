@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.agentruntime</groupId>
+    <artifactId>agent-runtime-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>agent-runtime-parent</name>
+    <description>Agent Runtime Spring Boot Starter — 企业 Java 中台的 Agent 可靠性增强层</description>
+    <url>https://github.com/Echo-moli/agent-runtime-starter</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/Echo-moli/agent-runtime-starter.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/Echo-moli/agent-runtime-starter.git</developerConnection>
+        <url>https://github.com/Echo-moli/agent-runtime-starter</url>
+    </scm>
+
+    <developers>
+        <developer>
+            <id>agent-runtime-team</id>
+            <name>Agent Runtime Team</name>
+            <organization>Agent Runtime Starter Contributors</organization>
+        </developer>
+    </developers>
+
+    <modules>
+        <module>agent-runtime-core</module>
+        <module>agent-runtime-spring-boot-starter</module>
+        <module>agent-runtime-samples</module>
+    </modules>
+
+    <properties>
+        <!--
+          DESIGN.md 目标语言为 Java 21（record、虚拟线程友好）。
+          本机工具链为 JDK 17，故本地验证用 release=17；record / switch arrow 在 17 已可用。
+          具备 JDK 21 的环境把下面的 release 改回 21 即可，源码无需改动。
+        -->
+        <maven.compiler.release>17</maven.compiler.release>
+        <!--
+          M8：starter 需要 Spring Boot，但 core 依然零依赖。
+          BOM 只在 parent 里 import，谁声明了依赖谁才真正拉取——core 的依赖树里没有任何 Spring 坐标。
+        -->
+        <spring-boot.version>3.3.5</spring-boot.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <!--
+          pluginManagement 只管版本，不会真正执行；JUnit5 测试必须由 3.x surefire 才跑得起来。
+          放到 plugins 里让三个模块统一继承，避免「starter 的测试跑了、core 的没跑」这种静默漏测。
+        -->
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <!-- 反射按参数名绑定工具入参，必须保留 -parameters -->
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.4.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.2.5</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+    <profiles>
+        <!--
+          Java 21 profile（DESIGN §目标版本）。默认 release=17 是为了本机 JDK17 开箱即用；
+          在装有 JDK21+ 的环境用 -Pjava21 即以 21 为目标编译，源码无需改动
+          （record / switch arrow 在 17 已可用，21 主要是虚拟线程友好）。
+        -->
+        <profile>
+            <id>java21</id>
+            <properties>
+                <maven.compiler.release>21</maven.compiler.release>
+            </properties>
+        </profile>
+
+        <!--
+          发布 profile：sources / javadoc / GPG 签名，仅在 -Prelease 时激活。
+          日常构建零额外开销；GPG 需要本机有 key（gpg.keyname）或环境变量 GPG_KEYNAME。
+          私服地址未写死——发布时用 -DaltDeploymentRepository= 指定，或按需在下面补
+          distributionManagement（企业内网地址各不相同，写死一个反而误导）。
+        -->
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals><goal>jar-no-fork</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <configuration>
+                            <!-- 文档里有大量中文与 HTML 标签，宽松处理避免发布被 javadoc 卡住 -->
+                            <doclint>none</doclint>
+                            <encoding>UTF-8</encoding>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals><goal>jar</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals><goal>sign</goal></goals>
+                                <configuration>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
