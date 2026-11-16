@@ -275,9 +275,35 @@ PASS  EVAL-16-judge-polite-tone                1ms      0.0087     3546tok  [jud
 <dependency>
   <groupId>com.agentruntime</groupId>
   <artifactId>agent-runtime-spring-boot-starter</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 </dependency>
 ```
+
+包发布在 GitHub Packages（`0.1.0` 起），接收方还需要两处配置。**注意：GitHub Packages 的公开包也要求认证**，这是平台规则：
+
+```xml
+<!-- 接收方 pom.xml：告诉 Maven 去哪个货架找 -->
+<repositories>
+  <repository>
+    <id>github</id>
+    <url>https://maven.pkg.github.com/Echo-moli/agent-runtime-starter</url>
+  </repository>
+</repositories>
+```
+```xml
+<!-- 接收方 ~/.m2/settings.xml：token 只需 read:packages 权限 -->
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>你的GitHub用户名</username>
+      <password>ghp_xxx</password>
+    </server>
+  </servers>
+</settings>
+```
+
+不想配 token 的，最省事仍是 clone 本仓库后跑 `mvn clean install`——坐标完全一样，只是包只在自己机器上。
 
 ```java
 @SpringBootApplication

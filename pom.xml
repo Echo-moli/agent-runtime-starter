@@ -6,7 +6,7 @@
 
     <groupId>com.agentruntime</groupId>
     <artifactId>agent-runtime-parent</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <packaging>pom</packaging>
     <name>agent-runtime-parent</name>
     <description>Agent Runtime Spring Boot Starter — 企业 Java 中台的 Agent 可靠性增强层</description>
@@ -39,6 +39,23 @@
         <module>agent-runtime-spring-boot-starter</module>
         <module>agent-runtime-samples</module>
     </modules>
+
+    <!--
+      GitHub Packages 发布地址（2026-11 起）。server id 必须与 settings.xml 中的 <server> 一致。
+      公开包也需要 GitHub token 才能拉取，这是 GitHub Packages 的固有约束，不是配置漏了。
+    -->
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Echo-moli/agent-runtime-starter</url>
+        </repository>
+        <snapshotRepository>
+            <id>github</id>
+            <name>GitHub Packages snapshots</name>
+            <url>https://maven.pkg.github.com/Echo-moli/agent-runtime-starter</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <properties>
         <!--
