@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Runtime 运维面板</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --surface: #fff; --border: #e3e6eb; --text: #1f2329; --muted: #6b7280;
+    --blue: #185fa5; --blue-bg: #e6f1fb; --green: #0f6e56; --green-bg: #e1f5ee;
+    --amber: #854f0b; --amber-bg: #faeeda; --red: #a32d2d; --red-bg: #fcebeb;
+    --gray-bg: #f1efe8; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; }
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           padding: 16px 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  header h1 { font-size: 17px; font-weight: 600; margin: 0; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1; }
+  .conn { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #888; }
+  .dot.ok { background: #1d9e75; } .dot.bad { background: #e24b4a; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+           color: var(--text); padding: 6px 12px; border-radius: 7px; }
+  button:hover { border-color: #b4b2a9; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+  button.danger { color: var(--red); border-color: #f09595; }
+  main { max-width: 1180px; margin: 24px auto; padding: 0 20px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+          padding: 14px 16px; }
+  .card .label { color: var(--muted); font-size: 12px; }
+  .card .value { font-size: 26px; font-weight: 600; margin-top: 4px; }
+  .card.alert .value { color: var(--red); }
+  nav { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  nav button { border: none; border-radius: 0; padding: 9px 15px; color: var(--muted);
+               border-bottom: 2px solid transparent; background: none; }
+  nav button.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+           padding: 16px 18px; }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar .hint { color: var(--muted); font-size: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 5px; font-size: 11px; white-space: nowrap; }
+  .tag.red { background: var(--red-bg); color: var(--red); }
+  .tag.amber { background: var(--amber-bg); color: var(--amber); }
+  .tag.green { background: var(--green-bg); color: var(--green); }
+  .tag.blue { background: var(--blue-bg); color: var(--blue); }
+  .tag.gray { background: var(--gray-bg); color: var(--muted); }
+  .id { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px;
+        color: var(--blue); cursor: pointer; word-break: break-all; }
+  .id:hover { text-decoration: underline; }
+  .ops { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ops button { padding: 3px 9px; font-size: 12px; }
+  .empty { text-align: center; color: var(--muted); padding: 34px 10px; }
+  .note-box { background: var(--amber-bg); color: var(--amber); border-radius: 7px;
+              padding: 9px 12px; font-size: 12px; margin-bottom: 14px; }
+  .toast { position: fixed; right: 22px; bottom: 22px; max-width: 420px; background: var(--surface);
+           border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 8px;
+           padding: 11px 16px; box-shadow: 0 6px 24px rgba(0,0,0,.1); font-size: 13px;
+           opacity: 0; transform: translateY(8px); transition: .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.err { border-left-color: var(--red); }
+  dialog { border: 1px solid var(--border); border-radius: 12px; padding: 22px; min-width: 380px;
+           max-width: 90vw; color: var(--text); background: var(--surface); }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  dialog h2 { font-size: 15px; margin: 0 0 8px; }
+  dialog p { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+  dialog textarea { width: 100%; min-height: 80px; font: inherit; padding: 9px; color: var(--text);
+                    background: var(--surface); border: 1px solid var(--border); border-radius: 7px;
+                    resize: vertical; }
+  dialog .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px;
+        font-size: 11px; overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-all; }
+  .field { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 13px; margin-bottom: 14px; }
+  .field .k { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Runtime 运维面板</h1>
+  <span class="sub" id="endpoint">/actuator/agentruntime</span>
+  <span class="spacer"></span>
+  <span class="conn"><span class="dot" id="dot"></span><span id="connText">连接中…</span></span>
+  <label class="conn"><input type="checkbox" id="autoRefresh"> 自动刷新 5s</label>
+  <button id="refreshBtn">刷新</button>
+</header>
+
+<main>
+  <div class="cards" id="cards"></div>
+
+  <nav id="tabs">
+    <button data-tab="suspended" class="active">挂起任务</button>
+    <button data-tab="indoubt">在途未知</button>
+    <button data-tab="orphans">孤儿任务</button>
+    <button data-tab="bulk">批量恢复</button>
+  </nav>
+
+  <section class="panel">
+    <div class="toolbar" id="toolbar"></div>
+    <div id="content"><div class="empty">加载中…</div></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="noteDialog">
+  <h2 id="dlgTitle">确认操作</h2>
+  <p id="dlgDesc"></p>
+  <label for="noteInput">审批依据 / 操作说明（必填，会写进审计日志）</label>
+  <textarea id="noteInput" placeholder="例：已与财务核对流水，确认未发生扣款"></textarea>
+  <div class="foot">
+    <button onclick="document.getElementById('noteDialog').close()">取消</button>
+    <button class="primary" id="dlgConfirm">确认执行</button>
+  </div>
+</dialog>
+
+<dialog id="detailDialog">
+  <h2>任务详情</h2>
+  <div class="field" id="detailFields"></div>
+  <h2 style="font-size:13px">事件轨迹</h2>
+  <pre id="detailTrajectory"></pre>
+  <h2 style="font-size:13px">步骤耗时 / 成本</h2>
+  <pre id="detailSpans"></pre>
+  <div class="foot"><button onclick="document.getElementById('detailDialog').close()">关闭</button></div>
+</dialog>
+
+<script>
+const BASE = '/actuator/agentruntime';
+let currentTab = 'suspended';
+let cachedOverview = {};
+let timer = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ago = s => s == null ? '—' : s < 60 ? s + ' 秒' : s < 3600 ? Math.floor(s/60) + ' 分钟' : Math.floor(s/3600) + ' 小时';
+
+async function api(path, body) {
+  const opt = body === undefined
+    ? { method: 'GET' }
+    : { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) };
+  const res = await fetch(BASE + path, opt);
+  if (!res.ok) throw new Error('HTTP ' + res.status + '：' + (await res.text()).slice(0, 200));
+  return res.json();
+}
+
+function toast(msg, isErr) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 4500);
+}
+
+function setConn(ok) {
+  $('dot').className = 'dot ' + (ok ? 'ok' : 'bad');
+  $('connText').textContent = ok ? '已连接' : '连接失败';
+}
+
+function renderCards(o) {
+  const counts = o.tasks || {};
+  const statusCard = (k, label, alert) =>
+    `<div class="card${alert ? ' alert' : ''}"><div class="label">${label}</div><div class="value">${counts[k] ?? 0}</div></div>`;
+  $('cards').innerHTML =
+    statusCard('SUSPENDED', '挂起待处理', true) +
+    statusCard('RUNNING', '执行中') +
+    statusCard('COMPLETED', '已完成') +
+    statusCard('FAILED', '失败') +
+    `<div class="card${o.staleInDoubt > 0 ? ' alert' : ''}"><div class="label">在途未知（超期）</div><div class="value">${o.staleInDoubt < 0 ? 'N/A' : o.staleInDoubt}</div></div>`;
+  cachedOverview = o;
+}
+
+function action(title, desc, path, note, danger) {
+  $('dlgTitle').textContent = title;
+  $('dlgDesc').textContent = desc;
+  $('noteInput').value = '';
+  $('dlgConfirm').className = 'primary' + (danger ? ' danger' : '');
+  $('dlgConfirm').onclick = async () => {
+    const text = $('noteInput').value.trim();
+    if (!text) { toast('请填写审批依据（必填，会写进审计日志）', true); return; }
+    $('noteDialog').close();
+    try {
+      const r = await api(path, { note: text });
+      if (r.ok === false) throw new Error(r.error || '操作被拒绝');
+      toast('✓ ' + (r.message || '操作已提交'));
+    } catch (e) { toast('✗ ' + e.message, true); }
+    refresh();
+  };
+  $('noteDialog').showModal();
+  setTimeout(() => $('noteInput').focus(), 50);
+}
+
+function renderSuspended(data) {
+  const items = data.items || [];
+  $('toolbar').innerHTML = `<span class="hint">共 ${data.count} 笔，显示 ${data.returned} 笔（上限 ${data.limit}）。在途未知排在最前——钱可能已经动了，优先处理。</span>`;
+  if (!items.length) { $('content').innerHTML = '<div class="empty">没有挂起任务</div>'; return; }
+  $('content').innerHTML = `<table><thead><tr>
+    <th>任务 / 智能体</th><th>等待的工具</th><th>状态</th><th>原因</th><th>已等待</th><th>操作</th>
+    </tr></thead><tbody>` + items.map(it => `<tr>
+      <td><span class="id" onclick="showTask('${esc(it.taskId)}')">${esc(it.taskId)}</span><br>
+          <span class="tag gray">${esc(it.agentName)}</span> <span class="hint">step ${esc(it.stepIndex)}</span></td>
+      <td>${esc(it.pendingTool || '—')}</td>
+      <td>${it.inDoubt ? '<span class="tag red">在途未知</span>' :
+           it.awaitingConfirmation ? '<span class="tag amber">等人工确认</span>' :
+           '<span class="tag blue">挂起</span>'}</td>
+      <td>${esc(it.reason || '—')}${it.inDoubtKey ? '<br><span class="hint">key: ' + esc(it.inDoubtKey) + '</span>' : ''}</td>
+      <td>${ago(it.waitedSeconds)}</td>
+      <td><div class="ops">
+        <button class="primary" onclick="action('批准续跑','任务会继续执行${it.inDoubt ? '；若已确认副作用未发生，改用强制重试' : ''}','resume/${encodeURIComponent(it.taskId)}')">批准</button>
+        <button onclick="action('拒绝','计划会读到 humanRejected，按拒绝路径继续','resume/${encodeURIComponent(it.taskId)}/reject')">拒绝</button>
+        ${it.inDoubt ? `<button class="danger" onclick="action('强制重试副作用','人工确认这笔副作用确实没发生，工具会真的再执行一次——请先对账！','resume/${encodeURIComponent(it.taskId)}/force')">强制重试</button>` : ''}
+      </div></td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderInDoubt(data) {
+  $('toolbar').innerHTML = `<span class="hint">超期阈值 ${esc(data.staleAfter)}，共 ${data.count} 笔。这是资损面：记录卡在 INIT，不知道副作用是否已发生。</span>`;
+  if (!data.supported) {
+    $('content').innerHTML = `<div class="note-box">不支持巡检：${esc(data.hint || '')}</div>`; return;
+  }
+  const items = data.items || [];
+  if (!items.length) { $('content').innerHTML = '<div class="empty">没有超期未决记录</div>'; return; }
+  $('content').innerHTML = `<table><thead><tr>
+    <th>幂等键 / 任务</th><th>步骤</th><th>状态</th><th>卡住多久</th><th>处置建议</th>
+    </tr></thead><tbody>` + items.map(it => `<tr>
+      <td><span class="id" onclick="showTask('${esc(it.taskId)}')">${esc(it.idempotencyKey)}</span><br>
+          <span class="hint">${esc(it.taskId)}</span></td>
+      <td>${esc(it.stepIndex)}</td>
+      <td><span class="tag red">${esc(it.status)}</span></td>
+      <td>${ago(it.waitedSeconds)}</td>
+      <td>${esc(it.action || '')}</td></tr>`).join('') + '</tbody></table>';
+}
+
+function renderOrphans(data) {
+  $('toolbar').innerHTML = `<span class="hint">租约 TTL ${esc(data.leaseTtl)}，${data.count} 个任务的持有者心跳已过期。单个恢复不要求开关；批量恢复默认关闭。</span>`;
+  const items = data.items || [];
+  if (!items.length) { $('content').innerHTML = '<div class="empty">没有孤儿任务</div>'; return; }
+  $('content').innerHTML = `<table><thead><tr>
+    <th>任务 / 智能体</th><th>状态</th><th>步骤</th><th>持有者</th><th>心跳过期</th><th>操作</th>
+    </tr></thead><tbody>` + items.map(it => `<tr>
+      <td><span class="id" onclick="showTask('${esc(it.taskId)}')">${esc(it.taskId)}</span><br>
+          <span class="tag gray">${esc(it.agentName)}</span></td>
+      <td><span class="tag amber">${esc(it.status)}</span></td>
+      <td>${esc(it.stepIndex)}</td>
+      <td>${esc(it.ownerId || '—')}</td>
+      <td>${ago(it.heartbeatAgeSeconds)}</td>
+      <td><button onclick="action('续跑中断任务','接管这个租约过期的任务并继续','recover/${encodeURIComponent(it.taskId)}')">恢复</button></td>
+      </tr>`).join('') + '</tbody></table>';
+}
+
+function renderBulk() {
+  const allowed = cachedOverview.bulkRecoverAllowed === true;
+  $('toolbar').innerHTML = '';
+  $('content').innerHTML = `
+    ${allowed ? '' : '<div class="note-box">批量恢复未开启。框架故意默认关闭——滚动发布时新实例抢跑会重放正在执行的任务。要体验请带 <code>-Dagent.runtime.ops.allow-bulk-recover=true</code> 重启。</div>'}
+    <p style="color:var(--muted)">先 dryRun 看清楚会动哪些任务，再决定是否真动手。两步都会写审计日志。</p>
+    <div class="ops">
+      <button onclick="bulk(false)">dryRun 预演（不动手）</button>
+      <button class="danger" id="bulkApply" ${allowed ? '' : 'disabled'}>批量恢复（真动手）</button>
+    </div>
+    <pre id="bulkResult">结果会显示在这里</pre>`;
+}
+
+async function bulk(dry) {
+  try {
+    const r = await api('recover-all' + (dry ? '' : '/apply'), { note: dry ? '面板 dryRun 预演' : '面板批量恢复' });
+    if (r.ok === false) throw new Error(r.error || '操作被拒绝');
+    $('bulkResult').textContent = JSON.stringify(r, null, 2);
+    toast('✓ ' + (r.message || '预演完成'));
+  } catch (e) { toast('✗ ' + e.message, true); }
+}
+
+async function showTask(id) {
+  try {
+    const t = await api('task/' + encodeURIComponent(id));
+    if (t.ok === false) throw new Error(t.error);
+    const fields = ['taskId','agentName','status','stepIndex','totalTokens','totalCost',
+                    'pendingTool','suspendedReason','inDoubtKey','ownerId','heartbeatAgeSeconds','leaseTtl'];
+    $('detailFields').innerHTML = fields.map(k => `<div class="k">${k}</div><div>${esc(t[k] ?? '—')}</div>`).join('');
+    $('detailTrajectory').textContent = t.trajectory || '（空）';
+    $('detailSpans').textContent = JSON.stringify(t.spans || [], null, 2);
+    $('detailDialog').showModal();
+  } catch (e) { toast('✗ ' + e.message, true); }
+}
+
+async function refresh() {
+  try {
+    const o = await api('overview');
+    setConn(true);
+    renderCards(o);
+    const data = await api(currentTab === 'indoubt' ? 'in-doubt' : currentTab);
+    ({ suspended: renderSuspended, indoubt: renderInDoubt, orphans: renderOrphans })[currentTab](data);
+  } catch (e) {
+    setConn(false);
+    $('content').innerHTML = `<div class="empty">加载失败：${esc(e.message)}<br><br>确认 ConsoleDemo 还在运行，且端点已暴露。</div>`;
+  }
+}
+
+$('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if (!btn) return;
+  currentTab = btn.dataset.tab;
+  [...$('tabs').children].forEach(b => b.classList.toggle('active', b === btn));
+  if (currentTab === 'bulk') renderBulk(); else refresh();
+});
+
+$('refreshBtn').onclick = refresh;
+$('autoRefresh').onchange = e => {
+  clearInterval(timer);
+  if (e.target.checked) timer = setInterval(() => { if (currentTab !== 'bulk') refresh(); }, 5000);
+};
+
+refresh();
+</script>
+</body>
+</html>

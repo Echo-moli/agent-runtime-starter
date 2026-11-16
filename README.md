@@ -43,6 +43,7 @@ String taskId = agentEngine.submit(new RefundAgent(), userId, "ORD-20261114-001"
 | M13 | **企业级补齐**：端点鉴权/归属校验/审计、有界队列与结果缓存/优雅停机、配置元数据与校验、Flyway 迁移、健康探针、发布治理、实例注册表/告警、Java 21 profile + 第二评测域 | ✅ 已完成（对照「完整性评审」逐条清零） |
 | M14 | Docker PostgreSQL 真方言门禁（一键验收脚本 + CI service container） | ✅ 已完成 |
 | M15 | 共享实例注册表 JDBC 版 + Webhook 告警出口（多副本判活、告警真发出去） | ✅ 已完成 |
+| M16 | 可视化运维面板（同源静态单页，点按钮完成挂起审批/恢复/巡检；不碰 core） | ✅ 已完成 |
 
 ## 快速开始
 
@@ -379,6 +380,23 @@ management.endpoints.web.exposure.include=agentruntime
 mvn -pl agent-runtime-samples install
 java -cp "…全量 classpath…" com.agentruntime.samples.m9.M9Demo
 ```
+
+**不想读 JSON？用可视化面板**（M16）。端点一个没改，只是加了张"把 JSON 画出来"的皮：
+
+```bash
+bash scripts/demo-console.sh                       # 默认 PG，需先 docker compose up -d --wait
+AGENT_DB=h2 bash scripts/demo-console.sh           # 没装 PG 时用 H2 替身
+# 浏览器打开 http://localhost:8080/agent-console.html
+```
+
+页面是 `static/agent-console.html`，纯 HTML/CSS/JS、无 CDN、无框架，跟端点**同源**（不用配 CORS，
+也不用 token——身份来自 `OpsPrincipal` bean，浏览器就是个普通 HTTP 客户端）。启动时会造一笔
+停在人工确认的退款，打开就能看到 SUSPENDED 任务，点「批准」能看着它真的跑完。四个页签：
+挂起任务（批准/拒绝/在途未知强制重试）、在途未知（资损面巡检）、孤儿任务（单个恢复）、
+批量恢复（dryRun 预演 → 真动手）。所有写操作**强制填审批依据**，和 curl 走同一条审计链路。
+
+批量恢复按钮在 `bulkRecoverAllowed=false` 时是灰的（框架默认关闭，防滚动发布抢跑）；
+想体验就带 `-Dagent.runtime.ops.allow-bulk-recover=true` 启动。
 
 实测输出（节选，全部是真实 HTTP 调用）：
 
